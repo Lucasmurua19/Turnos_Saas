@@ -11,7 +11,7 @@ from enum import Enum
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Query, status
 from pydantic import BaseModel, field_validator
-from sqlalchemy import Column, String, Boolean, Integer, SmallInteger, Text, Date, Time, ForeignKey, text, Enum as SqlEnum
+from sqlalchemy import Column, String, Boolean, Integer, SmallInteger, Text, Date, Time, ForeignKey, text, Enum as SqlEnum, Interval
 from sqlalchemy.dialects.postgresql import UUID, TIMESTAMP, JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -237,8 +237,9 @@ async def check_no_overlap(
                 "cancelado_paciente","cancelado_consultorio","reprogramado"
             ]),
             Appointment.scheduled_at < end_at,
-            func.cast(Appointment.scheduled_at, TIMESTAMP) +
-                func.cast(func.concat(Appointment.duration, ' minutes'), TIMESTAMP) > scheduled_at,
+            Appointment.scheduled_at + func.cast(
+                func.concat(Appointment.duration, ' minutes'), Interval
+            ) > scheduled_at,
         )
     )
     if exclude_id:
