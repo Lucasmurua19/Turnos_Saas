@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Turnos SaaS — Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0f1117;
+  --surface:   #181c27;
+  --surface2:  #1e2333;
+  --border:    #2a2f42;
+  --accent:    #4f7ef8;
+  --accent2:   #7c5cbf;
+  --success:   #22c55e;
+  --warning:   #f59e0b;
+  --danger:    #ef4444;
+  --text:      #e8eaf2;
+  --muted:     #7a7f96;
+  --font:      'DM Sans', sans-serif;
+  --mono:      'DM Mono', monospace;
+  --radius:    10px;
+  --radius-lg: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ── Layout ── */
+#app { display: flex; min-height: 100vh; }
+#sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 24px 0;
+  position: fixed; top: 0; left: 0; bottom: 0;
+}
+#main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+#topbar {
+  height: 56px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 28px;
+  gap: 16px; position: sticky; top: 0; z-index: 10;
+}
+#content { padding: 28px; flex: 1; }
+
+/* ── Sidebar ── */
+.logo {
+  padding: 0 20px 24px;
+  font-size: 15px; font-weight: 600; letter-spacing: -0.3px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.logo span { color: var(--accent); }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px; cursor: pointer;
+  color: var(--muted); font-weight: 500; font-size: 13.5px;
+  border-left: 2px solid transparent;
+  transition: all .15s;
+}
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,126,248,.07); }
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.nav-section { padding: 16px 20px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+
+/* ── Topbar ── */
+#page-title { font-size: 15px; font-weight: 600; flex: 1; }
+.badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-accent { background: rgba(79,126,248,.15); color: var(--accent); }
+.badge-success { background: rgba(34,197,94,.12); color: var(--success); }
+.badge-warning { background: rgba(245,158,11,.12); color: var(--warning); }
+.badge-danger  { background: rgba(239,68,68,.12);  color: var(--danger); }
+#tenant-name { font-size: 13px; color: var(--muted); }
+#logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: var(--radius); cursor: pointer; font-family: var(--font); font-size: 13px; transition: all .15s; }
+#logout-btn:hover { color: var(--text); border-color: var(--muted); }
+
+/* ── Cards ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+.card-value { font-size: 28px; font-weight: 600; letter-spacing: -1px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+
+/* ── Table ── */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.table-header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.table-header h3 { font-size: 14px; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; }
+th { padding: 10px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+td { padding: 12px 16px; border-bottom: 1px solid rgba(42,47,66,.5); font-size: 13.5px; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+
+/* ── Buttons ── */
+.btn { padding: 8px 16px; border-radius: var(--radius); border: none; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 500; transition: all .15s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #3d6ef0; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-ghost { background: none; border: 1px solid var(--border); color: var(--muted); }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+.btn-danger-ghost { background: none; border: 1px solid rgba(239,68,68,.3); color: var(--danger); }
+.btn-danger-ghost:hover { background: rgba(239,68,68,.08); }
+
+/* ── Forms ── */
+.form-group { margin-bottom: 16px; }
+label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+input, select, textarea {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-family: var(--font); font-size: 13.5px;
+  transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ── Modal ── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 28px; width: 520px; max-width: 95vw;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* ── Status chips ── */
+.status { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.s-programado           { background: rgba(79,126,248,.12); color: #7c9ef8; }
+.s-pendiente_confirmacion { background: rgba(245,158,11,.12); color: var(--warning); }
+.s-confirmado           { background: rgba(34,197,94,.12); color: var(--success); }
+.s-cancelado_paciente,
+.s-cancelado_consultorio { background: rgba(239,68,68,.12); color: var(--danger); }
+.s-sin_respuesta        { background: rgba(156,163,175,.12); color: #9ca3af; }
+.s-reprogramado         { background: rgba(124,92,191,.12); color: #a78bfa; }
+.s-completado           { background: rgba(34,197,94,.15); color: var(--success); }
+.s-ausente              { background: rgba(239,68,68,.08); color: #f87171; }
+
+/* ── Login ── */
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 40px; width: 380px;
+}
+.login-logo { text-align: center; margin-bottom: 28px; font-size: 20px; font-weight: 600; }
+.login-logo span { color: var(--accent); }
+.error-msg { color: var(--danger); font-size: 12px; margin-top: 8px; }
+
+/* ── Loader ── */
+.loader { text-align: center; color: var(--muted); padding: 40px; }
+.spin { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Date navigation ── */
+.date-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.date-nav button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 13px; border-radius: var(--radius); cursor: pointer; font-family: var(--font); }
+.date-nav button:hover { border-color: var(--accent); }
+#current-date-label { font-size: 15px; font-weight: 600; min-width: 180px; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Turnos <span>SaaS</span></div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" value="admin@demo.com" placeholder="tu@email.com"/>
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" value="admin123" placeholder="••••••••"/>
+    </div>
+    <div id="login-error" class="error-msg" style="display:none"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app" style="display:none">
+  <aside id="sidebar">
+    <div class="logo">Turnos <span>SaaS</span></div>
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" data-view="dashboard" onclick="navigate('dashboard')">
+      <span class="nav-icon">◈</span> Dashboard
+    </div>
+    <div class="nav-item" data-view="appointments" onclick="navigate('appointments')">
+      <span class="nav-icon">◷</span> Turnos
+    </div>
+    <div class="nav-section">Gestión</div>
+    <div class="nav-item" data-view="patients" onclick="navigate('patients')">
+      <span class="nav-icon">♟</span> Pacientes
+    </div>
+    <div class="nav-item" data-view="professionals" onclick="navigate('professionals')">
+      <span class="nav-icon">✦</span> Profesionales
+    </div>
+    <div class="nav-item" data-view="locations" onclick="navigate('locations')">
+      <span class="nav-icon">⬡</span> Sedes
+    </div>
+    <div class="nav-section">Comunicación</div>
+    <div class="nav-item" data-view="messages" onclick="navigate('messages')">
+      <span class="nav-icon">✉</span> Mensajes
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <div id="page-title">Dashboard</div>
+      <span id="tenant-name" class="badge badge-accent"></span>
+      <button id="logout-btn" onclick="doLogout()">Salir</button>
+    </div>
+    <div id="content">
+      <div class="loader"><div class="spin"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL TURNO ── -->
+<div class="modal-backdrop" id="appt-modal">
+  <div class="modal">
+    <div class="modal-title" id="appt-modal-title">Nuevo turno</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Paciente</label>
+        <select id="f-patient"></select>
+      </div>
+      <div class="form-group">
+        <label>Profesional</label>
+        <select id="f-professional"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Sede</label>
+        <select id="f-location"></select>
+      </div>
+      <div class="form-group">
+        <label>Fecha y hora</label>
+        <input type="datetime-local" id="f-scheduled-at"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Duración (min)</label>
+        <input type="number" id="f-duration" value="30" min="10" max="180" step="5"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea id="f-notes" rows="2" placeholder="Opcional…"></textarea>
+    </div>
+    <div id="appt-form-error" class="error-msg" style="display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('appt-modal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAppointment()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL PACIENTE ── -->
+<div class="modal-backdrop" id="patient-modal">
+  <div class="modal">
+    <div class="modal-title">Nuevo paciente</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" id="pf-name" placeholder="María García"/>
+      </div>
+      <div class="form-group">
+        <label>DNI</label>
+        <input type="text" id="pf-dni" placeholder="30123456"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="pf-email" placeholder="paciente@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="text" id="pf-phone" placeholder="+54 9 11 1234-5678"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea id="pf-notes" rows="2" placeholder="Alergias, condiciones relevantes…"></textarea>
+    </div>
+    <div id="patient-form-error" class="error-msg" style="display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('patient-modal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePatient()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = (window._env && window._env.API_URL) || 'http://localhost:8000';
+let token = null, tenantId = null, currentUser = null;
+let currentDate = new Date().toISOString().slice(0,10);
+let allPatients = [], allProfessionals = [], allLocations = [];
+let editingApptId = null;
+
+// ── Auth ──────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass  = document.getElementById('login-password').value;
+  const err   = document.getElementById('login-error');
+  err.style.display = 'none';
+  try {
+    const r = await fetch(`${API}/api/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || 'Error de login');
+    const data = await r.json();
+    token    = data.access_token;
+    tenantId = data.tenant_id;
+    currentUser = data;
+    localStorage.setItem('turnos_token', token);
+    localStorage.setItem('turnos_tenant', tenantId);
+    bootApp();
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('turnos_token');
+  localStorage.removeItem('turnos_tenant');
+  token = null; tenantId = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  if (currentUser) document.getElementById('tenant-name').textContent = currentUser.full_name || 'Admin';
+  navigate('dashboard');
+}
+
+// ── API helpers ───────────────────────────────────────────────────
+async function api(path, opts={}) {
+  const r = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${token}`, ...(opts.headers||{}) }
+  });
+  if (r.status === 401) { doLogout(); return null; }
+  if (!r.ok) {
+    const d = await r.json().catch(()=>({}));
+    throw new Error(d.detail || `Error ${r.status}`);
+  }
+  if (r.status === 204) return null;
+  return r.json();
+}
+
+// ── Navigation ────────────────────────────────────────────────────
+function navigate(view) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view===view));
+  const titles = {dashboard:'Dashboard', appointments:'Turnos', patients:'Pacientes', professionals:'Profesionales', locations:'Sedes', messages:'Mensajes'};
+  document.getElementById('page-title').textContent = titles[view] || view;
+  const views = {dashboard: renderDashboard, appointments: renderAppointments, patients: renderPatients, professionals: renderProfessionals, locations: renderLocations, messages: renderMessages};
+  (views[view] || (() => {}))();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────
+async function renderDashboard() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const [todayAppts, pendingAppts, confirmedAppts] = await Promise.all([
+      api(`/api/appointments?date=${today}`),
+      api(`/api/appointments?status=pendiente_confirmacion`),
+      api(`/api/appointments?status=confirmado`),
+    ]);
+    const all = todayAppts || [];
+    const cancelled = all.filter(a => a.status.includes('cancelado'));
+    c.innerHTML = `
+      <div class="stats-grid">
+        <div class="card"><div class="card-title">Turnos hoy</div><div class="card-value">${all.length}</div></div>
+        <div class="card"><div class="card-title">Pendientes confirmación</div><div class="card-value" style="color:var(--warning)">${(pendingAppts||[]).length}</div></div>
+        <div class="card"><div class="card-title">Confirmados</div><div class="card-value" style="color:var(--success)">${(confirmedAppts||[]).length}</div></div>
+        <div class="card"><div class="card-title">Cancelados hoy</div><div class="card-value" style="color:var(--danger)">${cancelled.length}</div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><h3>Turnos de hoy — ${formatDate(today)}</h3></div>
+        ${tableAppointments(all)}
+      </div>`;
+  } catch(e) { c.innerHTML = `<p style="color:var(--danger)">${e.message}</p>`; }
+}
+
+// ── Appointments ──────────────────────────────────────────────────
+async function renderAppointments() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  await loadDropdownData();
+  const appts = await api(`/api/appointments?date=${currentDate}`) || [];
+  c.innerHTML = `
+    <div class="date-nav">
+      <button onclick="changeDate(-1)">◀</button>
+      <div id="current-date-label">${formatDate(currentDate)}</div>
+      <button onclick="changeDate(1)">▶</button>
+      <button onclick="currentDate=new Date().toISOString().slice(0,10);renderAppointments()">Hoy</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="openNewAppt()">+ Nuevo turno</button>
+    </div>
+    <div class="table-wrap" id="appts-table">
+      <div class="table-header"><h3>${appts.length} turno${appts.length!==1?'s':''}</h3></div>
+      ${tableAppointments(appts, true)}
+    </div>`;
+}
+
+async function changeDate(delta) {
+  const d = new Date(currentDate + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  currentDate = d.toISOString().slice(0,10);
+  renderAppointments();
+}
+
+function tableAppointments(appts, withActions=false) {
+  if (!appts.length) return '<p style="color:var(--muted);padding:24px;text-align:center">No hay turnos</p>';
+  const rows = appts.map(a => {
+    const patient = allPatients.find(p=>p.id===a.patient_id);
+    const prof    = allProfessionals.find(p=>p.id===a.professional_id);
+    const time    = new Date(a.scheduled_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    const actions = withActions ? `
+      <button class="btn btn-sm btn-ghost" onclick="confirmAppt('${a.id}','confirmado')" title="Confirmar">✓</button>
+      <button class="btn btn-sm btn-ghost" onclick="openEditAppt('${a.id}')" title="Editar">✎</button>
+      <button class="btn btn-sm btn-danger-ghost" onclick="confirmAppt('${a.id}','cancelado_consultorio')" title="Cancelar">✕</button>` : '';
+    return `<tr>
+      <td><strong>${time}</strong></td>
+      <td>${patient?.full_name || a.patient_id.slice(0,8)+'…'}</td>
+      <td>${prof?.full_name || '—'}</td>
+      <td><span class="status s-${a.status}">${fmtStatus(a.status)}</span></td>
+      ${withActions ? `<td style="display:flex;gap:6px;padding:8px 16px">${actions}</td>` : ''}
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr>
+    <th>Hora</th><th>Paciente</th><th>Profesional</th><th>Estado</th>
+    ${withActions ? '<th>Acciones</th>' : ''}
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function confirmAppt(id, newStatus) {
+  try {
+    await api(`/api/appointments/${id}`, {method:'PATCH', body:JSON.stringify({status:newStatus})});
+    renderAppointments();
+  } catch(e) { alert(e.message); }
+}
+
+// ── Modal turno ───────────────────────────────────────────────────
+async function loadDropdownData() {
+  [allPatients, allProfessionals, allLocations] = await Promise.all([
+    api('/api/appointments/patients') || [],
+    api('/api/appointments/professionals') || [],
+    api('/api/appointments/locations') || [],
+  ]);
+}
+
+function populateSelects() {
+  const sel = (id, items, labelFn) => {
+    const el = document.getElementById(id);
+    el.innerHTML = items.map(i=>`<option value="${i.id}">${labelFn(i)}</option>`).join('');
+  };
+  sel('f-patient', allPatients, p=>p.full_name);
+  sel('f-professional', allProfessionals, p=>`${p.full_name}${p.specialty?' — '+p.specialty:''}`);
+  sel('f-location', allLocations, l=>l.name);
+}
+
+async function openNewAppt() {
+  editingApptId = null;
+  document.getElementById('appt-modal-title').textContent = 'Nuevo turno';
+  await loadDropdownData();
+  populateSelects();
+  const dt = `${currentDate}T09:00`;
+  document.getElementById('f-scheduled-at').value = dt;
+  document.getElementById('f-duration').value = 30;
+  document.getElementById('f-notes').value = '';
+  document.getElementById('appt-form-error').style.display = 'none';
+  openModal('appt-modal');
+}
+
+async function openEditAppt(id) {
+  editingApptId = id;
+  document.getElementById('appt-modal-title').textContent = 'Editar turno';
+  await loadDropdownData();
+  populateSelects();
+  const appt = await api(`/api/appointments/${id}`);
+  if (!appt) return;
+  document.getElementById('f-patient').value = appt.patient_id;
+  document.getElementById('f-professional').value = appt.professional_id;
+  document.getElementById('f-location').value = appt.location_id;
+  const local = new Date(appt.scheduled_at).toISOString().slice(0,16);
+  document.getElementById('f-scheduled-at').value = local;
+  document.getElementById('f-duration').value = appt.duration;
+  document.getElementById('f-notes').value = appt.notes || '';
+  document.getElementById('appt-form-error').style.display = 'none';
+  openModal('appt-modal');
+}
+
+async function saveAppointment() {
+  const err = document.getElementById('appt-form-error');
+  err.style.display = 'none';
+  const payload = {
+    patient_id:      document.getElementById('f-patient').value,
+    professional_id: document.getElementById('f-professional').value,
+    location_id:     document.getElementById('f-location').value,
+    scheduled_at:    document.getElementById('f-scheduled-at').value + ':00',
+    duration:        parseInt(document.getElementById('f-duration').value),
+    notes:           document.getElementById('f-notes').value || null,
+  };
+  try {
+    if (editingApptId) {
+      await api(`/api/appointments/${editingApptId}`, {method:'PATCH', body: JSON.stringify({scheduled_at: payload.scheduled_at, notes: payload.notes})});
+    } else {
+      await api('/api/appointments', {method:'POST', body: JSON.stringify(payload)});
+    }
+    closeModal('appt-modal');
+    renderAppointments();
+  } catch(e) { err.textContent = e.message; err.style.display = 'block'; }
+}
+
+// ── Patients ──────────────────────────────────────────────────────
+async function renderPatients() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  const patients = await api('/api/appointments/patients') || [];
+  allPatients = patients;
+  c.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="openModal('patient-modal')">+ Nuevo paciente</button>
+    </div>
+    <div class="table-wrap">
+      <div class="table-header"><h3>${patients.length} paciente${patients.length!==1?'s':''}</h3></div>
+      ${patients.length ? `<table><thead><tr>
+        <th>Nombre</th><th>DNI</th><th>Email</th><th>Teléfono</th><th>Canal</th>
+      </tr></thead><tbody>
+        ${patients.map(p=>`<tr>
+          <td><strong>${p.full_name}</strong></td>
+          <td>${p.dni||'—'}</td>
+          <td>${p.email||'—'}</td>
+          <td>${p.phone||'—'}</td>
+          <td><span class="badge badge-accent">${p.preferred_channel}</span></td>
+        </tr>`).join('')}
+      </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay pacientes registrados</p>'}
+    </div>`;
+}
+
+async function savePatient() {
+  const err = document.getElementById('patient-form-error');
+  err.style.display = 'none';
+  const payload = {
+    full_name: document.getElementById('pf-name').value,
+    dni:       document.getElementById('pf-dni').value || null,
+    email:     document.getElementById('pf-email').value || null,
+    phone:     document.getElementById('pf-phone').value || null,
+    notes:     document.getElementById('pf-notes').value || null,
+    preferred_channel: 'email',
+  };
+  if (!payload.full_name) { err.textContent='El nombre es requerido'; err.style.display='block'; return; }
+  try {
+    await api('/api/appointments/patients', {method:'POST', body:JSON.stringify(payload)});
+    closeModal('patient-modal');
+    renderPatients();
+  } catch(e) { err.textContent=e.message; err.style.display='block'; }
+}
+
+// ── Professionals ─────────────────────────────────────────────────
+async function renderProfessionals() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  const profs = await api('/api/appointments/professionals') || [];
+  allProfessionals = profs;
+  c.innerHTML = `
+    <div class="table-wrap">
+      <div class="table-header"><h3>Profesionales</h3></div>
+      ${profs.length ? `<table><thead><tr>
+        <th>Nombre</th><th>Especialidad</th><th>Email</th><th>Matrícula</th><th>Estado</th>
+      </tr></thead><tbody>
+        ${profs.map(p=>`<tr>
+          <td><strong>${p.full_name}</strong></td>
+          <td>${p.specialty||'—'}</td>
+          <td>${p.email||'—'}</td>
+          <td><span style="font-family:var(--mono);font-size:12px">${p.license_number||'—'}</span></td>
+          <td><span class="badge ${p.is_active?'badge-success':'badge-danger'}">${p.is_active?'Activo':'Inactivo'}</span></td>
+        </tr>`).join('')}
+      </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay profesionales registrados</p>'}
+    </div>`;
+}
+
+// ── Locations ─────────────────────────────────────────────────────
+async function renderLocations() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  const locs = await api('/api/appointments/locations') || [];
+  c.innerHTML = `
+    <div class="table-wrap">
+      <div class="table-header"><h3>Sedes</h3></div>
+      ${locs.length ? `<table><thead><tr>
+        <th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Estado</th>
+      </tr></thead><tbody>
+        ${locs.map(l=>`<tr>
+          <td><strong>${l.name}</strong></td>
+          <td>${l.address||'—'}</td>
+          <td>${l.phone||'—'}</td>
+          <td><span class="badge ${l.is_active?'badge-success':'badge-danger'}">${l.is_active?'Activa':'Inactiva'}</span></td>
+        </tr>`).join('')}
+      </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay sedes registradas</p>'}
+    </div>`;
+}
+
+// ── Messages ──────────────────────────────────────────────────────
+async function renderMessages() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  const msgs = await api('/api/messaging/messages') || [];
+  c.innerHTML = `
+    <div class="table-wrap">
+      <div class="table-header">
+        <h3>${msgs.length} mensaje${msgs.length!==1?'s':''} recientes</h3>
+        <button class="btn btn-sm btn-ghost" onclick="renderMessages()">↺ Actualizar</button>
+      </div>
+      ${msgs.length ? `<table><thead><tr>
+        <th>Asunto</th><th>Canal</th><th>Estado</th><th>Enviado</th>
+      </tr></thead><tbody>
+        ${msgs.map(m=>`<tr>
+          <td>${m.subject||'(sin asunto)'}</td>
+          <td><span class="badge badge-accent">${m.channel}</span></td>
+          <td><span class="badge ${m.status==='sent'?'badge-success':m.status==='failed'?'badge-danger':'badge-warning'}">${m.status}</span></td>
+          <td style="color:var(--muted);font-size:12px">${m.sent_at ? new Date(m.sent_at).toLocaleString('es-AR') : '—'}</td>
+        </tr>`).join('')}
+      </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay mensajes registrados</p>'}
+    </div>`;
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+
+// ── Utils ─────────────────────────────────────────────────────────
+function formatDate(iso) {
+  return new Date(iso+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+}
+function fmtStatus(s) {
+  const map = {
+    programado:'Programado', pendiente_confirmacion:'Pend. confirmación',
+    confirmado:'Confirmado', cancelado_paciente:'Cancelado (paciente)',
+    cancelado_consultorio:'Cancelado (consultorio)', sin_respuesta:'Sin respuesta',
+    reprogramado:'Reprogramado', completado:'Completado', ausente:'Ausente'
+  };
+  return map[s] || s;
+}
+
+// ── Auto-login desde localStorage ─────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('turnos_token');
+  const savedTenant = localStorage.getItem('turnos_tenant');
+  if (saved && savedTenant) {
+    token = saved; tenantId = savedTenant;
+    bootApp();
+  }
+});
+</script>
+</body>
+</html>

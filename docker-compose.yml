@@ -1,0 +1,147 @@
+version: "3.9"
+
+services:
+  # ─── Infraestructura ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: turnos_postgres
+    environment:
+      POSTGRES_USER: turnos
+      POSTGRES_PASSWORD: turnos_secret
+      POSTGRES_DB: turnos_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turnos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: turnos_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── Microservicios ────────────────────────────────────────────────
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: turnos_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - TENANT_SERVICE_URL=http://tenant-service:8002
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:8003
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8004
+      - MESSAGING_SERVICE_URL=http://messaging-service:8005
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=super-secret-key-change-in-production
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: turnos_auth
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://turnos:turnos_secret@postgres:5432/turnos_db
+      - SECRET_KEY=super-secret-key-change-in-production
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tenant-service:
+    build: ./services/tenant-service
+    container_name: turnos_tenant
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://turnos:turnos_secret@postgres:5432/turnos_db
+      - SECRET_KEY=super-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  appointment-service:
+    build: ./services/appointment-service
+    container_name: turnos_appointment
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://turnos:turnos_secret@postgres:5432/turnos_db
+      - SECRET_KEY=super-secret-key-change-in-production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notification-service:
+    build: ./services/notification-service
+    container_name: turnos_notification
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://turnos:turnos_secret@postgres:5432/turnos_db
+      - SECRET_KEY=super-secret-key-change-in-production
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:8003
+      - MESSAGING_SERVICE_URL=http://messaging-service:8005
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  messaging-service:
+    build: ./services/messaging-service
+    container_name: turnos_messaging
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://turnos:turnos_secret@postgres:5432/turnos_db
+      - SECRET_KEY=super-secret-key-change-in-production
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-mock}
+      - EMAIL_FROM=noreply@turnossaas.com
+      - EMAIL_MOCK_MODE=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Frontend ──────────────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: turnos_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
