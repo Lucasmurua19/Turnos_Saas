@@ -141,8 +141,16 @@ VALID_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     AppointmentStatus.reprogramado: set(),
     AppointmentStatus.completado: set(),
     AppointmentStatus.ausente: set(),
-    AppointmentStatus.cancelado_paciente: set(),
-    AppointmentStatus.cancelado_consultorio: set(),
+    AppointmentStatus.cancelado_paciente: {
+        AppointmentStatus.reprogramado,
+        AppointmentStatus.confirmado,
+        AppointmentStatus.pendiente_confirmacion,
+    },
+    AppointmentStatus.cancelado_consultorio: {
+        AppointmentStatus.reprogramado,
+        AppointmentStatus.confirmado,
+        AppointmentStatus.pendiente_confirmacion,
+    },
 }
 
 def can_transition(current: str, target: str) -> bool:
@@ -305,6 +313,13 @@ async def list_professionals(tenant_id: uuid.UUID=Depends(get_tenant_id), db: As
     r = await db.execute(select(Professional).where(Professional.tenant_id==tenant_id, Professional.is_active==True))
     return r.scalars().all()
 
+@app.get("/api/appointments/professionals/{prof_id}", response_model=ProfessionalResponse)
+async def get_professional(prof_id: uuid.UUID, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Professional).where(Professional.id==prof_id, Professional.tenant_id==tenant_id))
+    prof = r.scalar_one_or_none()
+    if not prof: raise HTTPException(404, "Profesional no encontrado")
+    return prof
+
 @app.patch("/api/appointments/professionals/{prof_id}/toggle")
 async def toggle_professional(prof_id: uuid.UUID, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
     r = await db.execute(select(Professional).where(Professional.id==prof_id, Professional.tenant_id==tenant_id))
@@ -345,6 +360,13 @@ async def list_patients(
         )
     r = await db.execute(stmt)
     return r.scalars().all()
+
+@app.get("/api/appointments/patients/{patient_id}", response_model=PatientResponse)
+async def get_patient(patient_id: uuid.UUID, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Patient).where(Patient.id==patient_id, Patient.tenant_id==tenant_id))
+    patient = r.scalar_one_or_none()
+    if not patient: raise HTTPException(404, "Paciente no encontrado")
+    return patient
 
 @app.put("/api/appointments/patients/{patient_id}", response_model=PatientResponse)
 async def update_patient(patient_id: uuid.UUID, body: PatientCreate, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):

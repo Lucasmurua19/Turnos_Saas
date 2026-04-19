@@ -367,6 +367,8 @@ const API = (window._env && window._env.API_URL) || 'http://localhost:8000';
 let token = null, tenantId = null, currentUser = null;
 let currentDate = new Date().toISOString().slice(0,10);
 let allPatients = [], allProfessionals = [], allLocations = [];
+let inactivePatientCache = {};
+let inactiveProfessionalCache = {};
 let editingApptId = null;
 let editingPatientId = null;
 let editingProfessionalId = null;
@@ -441,6 +443,7 @@ async function renderDashboard() {
   c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
   try {
     const today = new Date().toISOString().slice(0,10);
+    await loadDropdownData();
     const [todayAppts, pendingAppts, confirmedAppts] = await Promise.all([
       api(`/api/appointments?date=${today}`),
       api(`/api/appointments?status=pendiente_confirmacion`),
@@ -448,6 +451,7 @@ async function renderDashboard() {
     ]);
     const all = todayAppts || [];
     const cancelled = all.filter(a => a.status.includes('cancelado'));
+    const table = await tableAppointments(all);
     c.innerHTML = `
       <div class="stats-grid">
         <div class="card"><div class="card-title">Turnos hoy</div><div class="card-value">${all.length}</div></div>
@@ -457,7 +461,7 @@ async function renderDashboard() {
       </div>
       <div class="table-wrap">
         <div class="table-header"><h3>Turnos de hoy — ${formatDate(today)}</h3></div>
-        ${tableAppointments(all)}
+        ${table}
       </div>`;
   } catch(e) { c.innerHTML = `<p style="color:var(--danger)">${e.message}</p>`; }
 }
@@ -468,6 +472,7 @@ async function renderAppointments() {
   c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
   await loadDropdownData();
   const appts = await api(`/api/appointments?date=${currentDate}`) || [];
+  const table = await tableAppointments(appts, true);
   c.innerHTML = `
     <div class="date-nav">
       <button onclick="changeDate(-1)">◀</button>
@@ -479,7 +484,7 @@ async function renderAppointments() {
     </div>
     <div class="table-wrap" id="appts-table">
       <div class="table-header"><h3>${appts.length} turno${appts.length!==1?'s':''}</h3></div>
-      ${tableAppointments(appts, true)}
+      ${table}
     </div>`;
 }
 
@@ -490,28 +495,60 @@ async function changeDate(delta) {
   renderAppointments();
 }
 
-function tableAppointments(appts, withActions=false) {
+async function tableAppointments(appts, withActions=false) {
   if (!appts.length) return '<p style="color:var(--muted);padding:24px;text-align:center">No hay turnos</p>';
-  const rows = appts.map(a => {
+  const rows = await Promise.all(appts.map(async a => {
     const patient = allPatients.find(p=>p.id===a.patient_id);
     const prof    = allProfessionals.find(p=>p.id===a.professional_id);
     const time    = new Date(a.scheduled_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    const resolvedPatient = patient || await resolvePatientById(a.patient_id);
+    const resolvedProf = prof || await resolveProfessionalById(a.professional_id);
+    const patientLabel = resolvedPatient
+      ? `${resolvedPatient.full_name}${resolvedPatient.is_active ? '' : ' <span class="badge badge-warning">inactivo</span>'}`
+      : a.patient_id.slice(0,8)+'…';
+    const profLabel = resolvedProf
+      ? `${resolvedProf.full_name}${resolvedProf.is_active ? '' : ' <span class="badge badge-warning">inactivo</span>'}`
+      : '—';
     const actions = withActions ? `
       <button class="btn btn-sm btn-ghost" onclick="confirmAppt('${a.id}','confirmado')" title="Confirmar">✓</button>
       <button class="btn btn-sm btn-ghost" onclick="openEditAppt('${a.id}')" title="Editar">✎</button>
       <button class="btn btn-sm btn-danger-ghost" onclick="confirmAppt('${a.id}','cancelado_consultorio')" title="Cancelar">✕</button>` : '';
     return `<tr>
       <td><strong>${time}</strong></td>
-      <td>${patient?.full_name || a.patient_id.slice(0,8)+'…'}</td>
-      <td>${prof?.full_name || '—'}</td>
+      <td>${patientLabel}</td>
+      <td>${profLabel}</td>
       <td><span class="status s-${a.status}">${fmtStatus(a.status)}</span></td>
       ${withActions ? `<td style="display:flex;gap:6px;padding:8px 16px">${actions}</td>` : ''}
     </tr>`;
-  }).join('');
+  }));
   return `<table><thead><tr>
     <th>Hora</th><th>Paciente</th><th>Profesional</th><th>Estado</th>
     ${withActions ? '<th>Acciones</th>' : ''}
-  </tr></thead><tbody>${rows}</tbody></table>`;
+  </tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+
+async function resolvePatientById(patientId) {
+  if (!patientId) return null;
+  if (inactivePatientCache[patientId]) return inactivePatientCache[patientId];
+  try {
+    const data = await api(`/api/appointments/patients/${patientId}`);
+    if (data) inactivePatientCache[patientId] = data;
+    return data;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function resolveProfessionalById(professionalId) {
+  if (!professionalId) return null;
+  if (inactiveProfessionalCache[professionalId]) return inactiveProfessionalCache[professionalId];
+  try {
+    const data = await api(`/api/appointments/professionals/${professionalId}`);
+    if (data) inactiveProfessionalCache[professionalId] = data;
+    return data;
+  } catch (_) {
+    return null;
+  }
 }
 
 async function confirmAppt(id, newStatus) {
