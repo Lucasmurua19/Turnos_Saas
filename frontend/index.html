@@ -590,6 +590,16 @@ async function openNewAppt() {
   openModal('appt-modal');
 }
 
+async function addSelectOption(selectId, value, label) {
+  const select = document.getElementById(selectId);
+  if (!select.querySelector(`option[value="${value}"]`)) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+}
+
 async function openEditAppt(id) {
   editingApptId = id;
   document.getElementById('appt-modal-title').textContent = 'Editar turno';
@@ -597,6 +607,18 @@ async function openEditAppt(id) {
   populateSelects();
   const appt = await api(`/api/appointments/${id}`);
   if (!appt) return;
+  if (!document.getElementById('f-patient').querySelector(`option[value="${appt.patient_id}"]`)) {
+    const currentPatient = await api(`/api/appointments/patients/${appt.patient_id}`);
+    if (currentPatient) addSelectOption('f-patient', currentPatient.id, `${currentPatient.full_name}${currentPatient.is_active ? '' : ' (inactivo)'}`);
+  }
+  if (!document.getElementById('f-professional').querySelector(`option[value="${appt.professional_id}"]`)) {
+    const currentProf = await api(`/api/appointments/professionals/${appt.professional_id}`);
+    if (currentProf) addSelectOption('f-professional', currentProf.id, `${currentProf.full_name}${currentProf.is_active ? '' : ' (inactivo)'}`);
+  }
+  if (!document.getElementById('f-location').querySelector(`option[value="${appt.location_id}"]`)) {
+    const currentLoc = await api(`/api/appointments/locations/${appt.location_id}`);
+    if (currentLoc) addSelectOption('f-location', currentLoc.id, `${currentLoc.name}${currentLoc.is_active ? '' : ' (inactivo)'}`);
+  }
   document.getElementById('f-patient').value = appt.patient_id;
   document.getElementById('f-professional').value = appt.professional_id;
   document.getElementById('f-location').value = appt.location_id;
@@ -621,7 +643,7 @@ async function saveAppointment() {
   };
   try {
     if (editingApptId) {
-      await api(`/api/appointments/${editingApptId}`, {method:'PATCH', body: JSON.stringify({scheduled_at: payload.scheduled_at, notes: payload.notes})});
+      await api(`/api/appointments/${editingApptId}`, {method:'PATCH', body: JSON.stringify(payload)});
     } else {
       await api('/api/appointments', {method:'POST', body: JSON.stringify(payload)});
     }

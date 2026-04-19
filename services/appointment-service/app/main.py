@@ -210,6 +210,10 @@ class AppointmentCreate(BaseModel):
 
 class AppointmentUpdate(BaseModel):
     scheduled_at: Optional[datetime]=None
+    patient_id: Optional[uuid.UUID]=None
+    professional_id: Optional[uuid.UUID]=None
+    location_id: Optional[uuid.UUID]=None
+    duration: Optional[int]=None
     status: Optional[str]=None; notes: Optional[str]=None
 
 class AppointmentResponse(BaseModel):
@@ -280,6 +284,13 @@ async def create_location(body: LocationCreate, tenant_id: uuid.UUID=Depends(get
 async def list_locations(tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
     r = await db.execute(select(Location).where(Location.tenant_id==tenant_id, Location.is_active==True))
     return r.scalars().all()
+
+@app.get("/api/appointments/locations/{loc_id}", response_model=LocationResponse)
+async def get_location(loc_id: uuid.UUID, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Location).where(Location.id==loc_id, Location.tenant_id==tenant_id))
+    loc = r.scalar_one_or_none()
+    if not loc: raise HTTPException(404, "Sede no encontrada")
+    return loc
 
 @app.put("/api/appointments/locations/{loc_id}", response_model=LocationResponse)
 async def update_location(loc_id: uuid.UUID, body: LocationCreate, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
@@ -456,21 +467,46 @@ async def update_appointment(
     appt = r.scalar_one_or_none()
     if not appt: raise HTTPException(404, "Turno no encontrado")
 
+    if body.patient_id and body.patient_id != appt.patient_id:
+        r = await db.execute(select(Patient).where(Patient.id==body.patient_id, Patient.tenant_id==tenant_id))
+        if not r.scalar_one_or_none(): raise HTTPException(404, "Paciente no encontrado")
+        appt.patient_id = body.patient_id
+
+    if body.professional_id and body.professional_id != appt.professional_id:
+        r = await db.execute(select(Professional).where(Professional.id==body.professional_id, Professional.tenant_id==tenant_id))
+        if not r.scalar_one_or_none(): raise HTTPException(404, "Profesional no encontrado")
+        appt.professional_id = body.professional_id
+
+    if body.location_id and body.location_id != appt.location_id:
+        r = await db.execute(select(Location).where(Location.id==body.location_id, Location.tenant_id==tenant_id))
+        if not r.scalar_one_or_none(): raise HTTPException(404, "Sede no encontrada")
+        appt.location_id = body.location_id
+
     if body.status and body.status != appt.status:
         if not can_transition(appt.status, body.status):
             raise HTTPException(
                 status_code=422,
                 detail=f"Transición inválida: {appt.status} → {body.status}"
             )
-        # Timestamps automáticos por estado
         now = datetime.now(timezone.utc)
-        if body.status == "confirmado":             appt.confirmed_at = now
-        elif body.status in ("cancelado_paciente","cancelado_consultorio"): appt.cancelled_at = now
-        elif body.status == "completado":           appt.completed_at = now
+        if body.status == "confirmado":
+            appt.confirmed_at = now
+        elif body.status in ("cancelado_paciente","cancelado_consultorio"):
+            appt.cancelled_at = now
+        elif body.status == "completado":
+            appt.completed_at = now
         appt.status = body.status
 
+    if body.duration is not None:
+        appt.duration = body.duration
+
+    if body.scheduled_at or body.professional_id or body.duration is not None:
+        scheduled_at = body.scheduled_at or appt.scheduled_at
+        professional_id = body.professional_id or appt.professional_id
+        duration = body.duration if body.duration is not None else appt.duration
+        await check_no_overlap(db, professional_id, scheduled_at, duration, exclude_id=appt_id)
+
     if body.scheduled_at:
-        await check_no_overlap(db, appt.professional_id, body.scheduled_at, appt.duration, exclude_id=appt_id)
         appt.scheduled_at = body.scheduled_at
 
     if body.notes is not None: appt.notes = body.notes
