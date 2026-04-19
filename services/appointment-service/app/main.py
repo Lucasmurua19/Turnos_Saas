@@ -273,6 +273,25 @@ async def list_locations(tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncS
     r = await db.execute(select(Location).where(Location.tenant_id==tenant_id, Location.is_active==True))
     return r.scalars().all()
 
+@app.put("/api/appointments/locations/{loc_id}", response_model=LocationResponse)
+async def update_location(loc_id: uuid.UUID, body: LocationCreate, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Location).where(Location.id==loc_id, Location.tenant_id==tenant_id))
+    loc = r.scalar_one_or_none()
+    if not loc: raise HTTPException(404, "Sede no encontrada")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(loc, k, v)
+    await db.commit(); await db.refresh(loc)
+    return loc
+
+@app.patch("/api/appointments/locations/{loc_id}/toggle")
+async def toggle_location(loc_id: uuid.UUID, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Location).where(Location.id==loc_id, Location.tenant_id==tenant_id))
+    loc = r.scalar_one_or_none()
+    if not loc: raise HTTPException(404, "Sede no encontrada")
+    loc.is_active = not loc.is_active
+    await db.commit()
+    return {"id": str(loc_id), "is_active": loc.is_active}
+
 # ─── PROFESSIONALS ────────────────────────────────────────────────
 
 @app.post("/api/appointments/professionals", response_model=ProfessionalResponse, status_code=201)
@@ -294,6 +313,16 @@ async def toggle_professional(prof_id: uuid.UUID, tenant_id: uuid.UUID=Depends(g
     prof.is_active = not prof.is_active
     await db.commit()
     return {"id": str(prof_id), "is_active": prof.is_active}
+
+@app.put("/api/appointments/professionals/{prof_id}", response_model=ProfessionalResponse)
+async def update_professional(prof_id: uuid.UUID, body: ProfessionalCreate, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Professional).where(Professional.id==prof_id, Professional.tenant_id==tenant_id))
+    prof = r.scalar_one_or_none()
+    if not prof: raise HTTPException(404, "Profesional no encontrado")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(prof, k, v)
+    await db.commit(); await db.refresh(prof)
+    return prof
 
 # ─── PATIENTS ─────────────────────────────────────────────────────
 
@@ -326,6 +355,15 @@ async def update_patient(patient_id: uuid.UUID, body: PatientCreate, tenant_id: 
         setattr(patient, k, v)
     await db.commit(); await db.refresh(patient)
     return patient
+
+@app.patch("/api/appointments/patients/{patient_id}/toggle")
+async def toggle_patient(patient_id: uuid.UUID, tenant_id: uuid.UUID=Depends(get_tenant_id), db: AsyncSession=Depends(get_db)):
+    r = await db.execute(select(Patient).where(Patient.id==patient_id, Patient.tenant_id==tenant_id))
+    patient = r.scalar_one_or_none()
+    if not patient: raise HTTPException(404, "Paciente no encontrado")
+    patient.is_active = not patient.is_active
+    await db.commit()
+    return {"id": str(patient_id), "is_active": patient.is_active}
 
 # ─── SCHEDULES ────────────────────────────────────────────────────
 
