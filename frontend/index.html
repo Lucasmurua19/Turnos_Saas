@@ -271,7 +271,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 <!-- ── MODAL PACIENTE ── -->
 <div class="modal-backdrop" id="patient-modal">
   <div class="modal">
-    <div class="modal-title">Nuevo paciente</div>
+    <div class="modal-title" id="patient-modal-title">Nuevo paciente</div>
     <div class="form-row">
       <div class="form-group">
         <label>Nombre completo</label>
@@ -304,12 +304,73 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   </div>
 </div>
 
+<!-- ── MODAL PROFESIONAL ── -->
+<div class="modal-backdrop" id="professional-modal">
+  <div class="modal">
+    <div class="modal-title" id="professional-modal-title">Nuevo profesional</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" id="prof-name" placeholder="Dr. Juan Pérez"/>
+      </div>
+      <div class="form-group">
+        <label>Especialidad</label>
+        <input type="text" id="prof-specialty" placeholder="Cardiología"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="prof-email" placeholder="profesional@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Número de matrícula</label>
+        <input type="text" id="prof-license" placeholder="12345"/>
+      </div>
+    </div>
+    <div id="professional-form-error" class="error-msg" style="display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('professional-modal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveProfessional()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL SEDE ── -->
+<div class="modal-backdrop" id="location-modal">
+  <div class="modal">
+    <div class="modal-title" id="location-modal-title">Nueva sede</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="text" id="loc-name" placeholder="Consultorio Central"/>
+      </div>
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="text" id="loc-phone" placeholder="+54 9 11 1234-5678"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Dirección</label>
+      <textarea id="loc-address" rows="2" placeholder="Calle 123, Ciudad, Provincia"></textarea>
+    </div>
+    <div id="location-form-error" class="error-msg" style="display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('location-modal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveLocation()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = (window._env && window._env.API_URL) || 'http://localhost:8000';
 let token = null, tenantId = null, currentUser = null;
 let currentDate = new Date().toISOString().slice(0,10);
 let allPatients = [], allProfessionals = [], allLocations = [];
 let editingApptId = null;
+let editingPatientId = null;
+let editingProfessionalId = null;
+let editingLocationId = null;
 
 // ── Auth ──────────────────────────────────────────────────────────
 async function doLogin() {
@@ -540,12 +601,12 @@ async function renderPatients() {
   allPatients = patients;
   c.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-primary" onclick="openModal('patient-modal')">+ Nuevo paciente</button>
+      <button class="btn btn-primary" onclick="openNewPatient()">+ Nuevo paciente</button>
     </div>
     <div class="table-wrap">
       <div class="table-header"><h3>${patients.length} paciente${patients.length!==1?'s':''}</h3></div>
       ${patients.length ? `<table><thead><tr>
-        <th>Nombre</th><th>DNI</th><th>Email</th><th>Teléfono</th><th>Canal</th>
+        <th>Nombre</th><th>DNI</th><th>Email</th><th>Teléfono</th><th>Canal</th><th>Acciones</th>
       </tr></thead><tbody>
         ${patients.map(p=>`<tr>
           <td><strong>${p.full_name}</strong></td>
@@ -553,6 +614,10 @@ async function renderPatients() {
           <td>${p.email||'—'}</td>
           <td>${p.phone||'—'}</td>
           <td><span class="badge badge-accent">${p.preferred_channel}</span></td>
+          <td>
+            <button class="btn btn-sm btn-ghost" onclick="openEditPatient('${p.id}')" title="Editar">✎</button>
+            <button class="btn btn-sm btn-ghost" onclick="togglePatient('${p.id}')" title="Desactivar">⏸</button>
+          </td>
         </tr>`).join('')}
       </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay pacientes registrados</p>'}
     </div>`;
@@ -571,10 +636,153 @@ async function savePatient() {
   };
   if (!payload.full_name) { err.textContent='El nombre es requerido'; err.style.display='block'; return; }
   try {
-    await api('/api/appointments/patients', {method:'POST', body:JSON.stringify(payload)});
+    if (editingPatientId) {
+      await api(`/api/appointments/patients/${editingPatientId}`, {method:'PUT', body:JSON.stringify(payload)});
+    } else {
+      await api('/api/appointments/patients', {method:'POST', body:JSON.stringify(payload)});
+    }
     closeModal('patient-modal');
     renderPatients();
   } catch(e) { err.textContent=e.message; err.style.display='block'; }
+}
+
+function openNewPatient() {
+  editingPatientId = null;
+  document.getElementById('patient-modal-title').textContent = 'Nuevo paciente';
+  document.getElementById('pf-name').value = '';
+  document.getElementById('pf-dni').value = '';
+  document.getElementById('pf-email').value = '';
+  document.getElementById('pf-phone').value = '';
+  document.getElementById('pf-notes').value = '';
+  document.getElementById('patient-form-error').style.display = 'none';
+  openModal('patient-modal');
+}
+
+async function openEditPatient(id) {
+  editingPatientId = id;
+  document.getElementById('patient-modal-title').textContent = 'Editar paciente';
+  const patient = allPatients.find(p => p.id === id);
+  if (patient) {
+    document.getElementById('pf-name').value = patient.full_name || '';
+    document.getElementById('pf-dni').value = patient.dni || '';
+    document.getElementById('pf-email').value = patient.email || '';
+    document.getElementById('pf-phone').value = patient.phone || '';
+    document.getElementById('pf-notes').value = patient.notes || '';
+  }
+  document.getElementById('patient-form-error').style.display = 'none';
+  openModal('patient-modal');
+}
+
+async function togglePatient(id) {
+  try {
+    await api(`/api/appointments/patients/${id}/toggle`, {method:'PATCH'});
+    renderPatients();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ── Professional functions ─────────────────────────────────────────
+async function saveProfessional() {
+  const err = document.getElementById('professional-form-error');
+  err.style.display = 'none';
+  const payload = {
+    full_name: document.getElementById('prof-name').value,
+    specialty: document.getElementById('prof-specialty').value || null,
+    email: document.getElementById('prof-email').value || null,
+    license_number: document.getElementById('prof-license').value || null,
+  };
+  if (!payload.full_name) { err.textContent='El nombre es requerido'; err.style.display='block'; return; }
+  try {
+    if (editingProfessionalId) {
+      await api(`/api/appointments/professionals/${editingProfessionalId}`, {method:'PUT', body:JSON.stringify(payload)});
+    } else {
+      await api('/api/appointments/professionals', {method:'POST', body:JSON.stringify(payload)});
+    }
+    closeModal('professional-modal');
+    renderProfessionals();
+  } catch(e) { err.textContent=e.message; err.style.display='block'; }
+}
+
+function openNewProfessional() {
+  editingProfessionalId = null;
+  document.getElementById('professional-modal-title').textContent = 'Nuevo profesional';
+  document.getElementById('prof-name').value = '';
+  document.getElementById('prof-specialty').value = '';
+  document.getElementById('prof-email').value = '';
+  document.getElementById('prof-license').value = '';
+  document.getElementById('professional-form-error').style.display = 'none';
+  openModal('professional-modal');
+}
+
+async function openEditProfessional(id) {
+  editingProfessionalId = id;
+  document.getElementById('professional-modal-title').textContent = 'Editar profesional';
+  const prof = allProfessionals.find(p => p.id === id);
+  if (prof) {
+    document.getElementById('prof-name').value = prof.full_name || '';
+    document.getElementById('prof-specialty').value = prof.specialty || '';
+    document.getElementById('prof-email').value = prof.email || '';
+    document.getElementById('prof-license').value = prof.license_number || '';
+  }
+  document.getElementById('professional-form-error').style.display = 'none';
+  openModal('professional-modal');
+}
+
+async function toggleProfessional(id) {
+  try {
+    await api(`/api/appointments/professionals/${id}/toggle`, {method:'PATCH'});
+    renderProfessionals();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ── Location functions ─────────────────────────────────────────────
+async function saveLocation() {
+  const err = document.getElementById('location-form-error');
+  err.style.display = 'none';
+  const payload = {
+    name: document.getElementById('loc-name').value,
+    address: document.getElementById('loc-address').value || null,
+    phone: document.getElementById('loc-phone').value || null,
+  };
+  if (!payload.name) { err.textContent='El nombre es requerido'; err.style.display='block'; return; }
+  try {
+    if (editingLocationId) {
+      await api(`/api/appointments/locations/${editingLocationId}`, {method:'PUT', body:JSON.stringify(payload)});
+    } else {
+      await api('/api/appointments/locations', {method:'POST', body:JSON.stringify(payload)});
+    }
+    closeModal('location-modal');
+    renderLocations();
+  } catch(e) { err.textContent=e.message; err.style.display='block'; }
+}
+
+function openNewLocation() {
+  editingLocationId = null;
+  document.getElementById('location-modal-title').textContent = 'Nueva sede';
+  document.getElementById('loc-name').value = '';
+  document.getElementById('loc-address').value = '';
+  document.getElementById('loc-phone').value = '';
+  document.getElementById('location-form-error').style.display = 'none';
+  openModal('location-modal');
+}
+
+async function openEditLocation(id) {
+  editingLocationId = id;
+  document.getElementById('location-modal-title').textContent = 'Editar sede';
+  const loc = allLocations.find(l => l.id === id);
+  if (loc) {
+    document.getElementById('loc-name').value = loc.name || '';
+    document.getElementById('loc-address').value = loc.address || '';
+    document.getElementById('loc-phone').value = loc.phone || '';
+  }
+  document.getElementById('location-form-error').style.display = 'none';
+  openModal('location-modal');
+}
+
+async function toggleLocation(id) {
+  try {
+    await api(`/api/appointments/locations/${id}/toggle`, {method:'PATCH'});
+    renderLocations();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 // ── Professionals ─────────────────────────────────────────────────
@@ -584,10 +792,13 @@ async function renderProfessionals() {
   const profs = await api('/api/appointments/professionals') || [];
   allProfessionals = profs;
   c.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="openNewProfessional()">+ Nuevo profesional</button>
+    </div>
     <div class="table-wrap">
-      <div class="table-header"><h3>Profesionales</h3></div>
+      <div class="table-header"><h3>${profs.length} profesional${profs.length!==1?'es':''}</h3></div>
       ${profs.length ? `<table><thead><tr>
-        <th>Nombre</th><th>Especialidad</th><th>Email</th><th>Matrícula</th><th>Estado</th>
+        <th>Nombre</th><th>Especialidad</th><th>Email</th><th>Matrícula</th><th>Estado</th><th>Acciones</th>
       </tr></thead><tbody>
         ${profs.map(p=>`<tr>
           <td><strong>${p.full_name}</strong></td>
@@ -595,6 +806,10 @@ async function renderProfessionals() {
           <td>${p.email||'—'}</td>
           <td><span style="font-family:var(--mono);font-size:12px">${p.license_number||'—'}</span></td>
           <td><span class="badge ${p.is_active?'badge-success':'badge-danger'}">${p.is_active?'Activo':'Inactivo'}</span></td>
+          <td>
+            <button class="btn btn-sm btn-ghost" onclick="openEditProfessional('${p.id}')" title="Editar">✎</button>
+            <button class="btn btn-sm btn-ghost" onclick="toggleProfessional('${p.id}')" title="${p.is_active?'Desactivar':'Activar'}">${p.is_active?'⏸':'▶'}</button>
+          </td>
         </tr>`).join('')}
       </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay profesionales registrados</p>'}
     </div>`;
@@ -606,16 +821,23 @@ async function renderLocations() {
   c.innerHTML = '<div class="loader"><div class="spin"></div></div>';
   const locs = await api('/api/appointments/locations') || [];
   c.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="openNewLocation()">+ Nueva sede</button>
+    </div>
     <div class="table-wrap">
-      <div class="table-header"><h3>Sedes</h3></div>
+      <div class="table-header"><h3>${locs.length} sede${locs.length!==1?'s':''}</h3></div>
       ${locs.length ? `<table><thead><tr>
-        <th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Estado</th>
+        <th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Estado</th><th>Acciones</th>
       </tr></thead><tbody>
         ${locs.map(l=>`<tr>
           <td><strong>${l.name}</strong></td>
           <td>${l.address||'—'}</td>
           <td>${l.phone||'—'}</td>
           <td><span class="badge ${l.is_active?'badge-success':'badge-danger'}">${l.is_active?'Activa':'Inactiva'}</span></td>
+          <td>
+            <button class="btn btn-sm btn-ghost" onclick="openEditLocation('${l.id}')" title="Editar">✎</button>
+            <button class="btn btn-sm btn-ghost" onclick="toggleLocation('${l.id}')" title="${l.is_active?'Desactivar':'Activar'}">${l.is_active?'⏸':'▶'}</button>
+          </td>
         </tr>`).join('')}
       </tbody></table>` : '<p style="color:var(--muted);padding:24px;text-align:center">No hay sedes registradas</p>'}
     </div>`;
